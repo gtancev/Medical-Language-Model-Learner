@@ -1,0 +1,9 @@
+flask
+flask_cors
+gunicorn
+streamlit==0.47.4
+sklearn
+numpy
+altair
+matplotlib
+pandas
