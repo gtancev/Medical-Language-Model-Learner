@@ -7,8 +7,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.preprocessing import OrdinalEncoder, LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import RandomizedSearchCV
-from sklearn.metrics import confusion_matrix,f1_score
-from sklearn.decomposition import NMF,LatentDirichletAllocation,TruncatedSVD
+from sklearn.metrics import confusion_matrix, f1_score
+from sklearn.decomposition import TruncatedSVD
 import itertools
 
 import matplotlib.pyplot as plt
@@ -21,8 +21,7 @@ from streamlit.logger import get_logger
 
 LOGGER = get_logger(__name__)
 enc = LabelEncoder()
-plt.rcParams['lines.linewidth'] = 1.0
-plt.rcParams['font.size'] = 6.0
+
 
 def run():
     st.sidebar.text("© Georgi Tancev")
@@ -47,7 +46,7 @@ def run():
         "It is advisable to remove classes which are underrepresented and whose abundance is below some treshold to achieve a better classification performance.",
         "(Alternatively, try to collect more data.)")
         st.write("In addition, there are several degrees of freedom for the construction of the dictionary. Adjusting those parameters has an influence on the amount and kind of words (features) which are included in the model.")
-        st.subheader("Load data.")
+        st.subheader("Load some data.")
         st.write("Display sample data by ticking the checkbox in the sidebar.")
         #filename = st.sidebar.text_input('Enter the filename of a csv-file.')
 
@@ -55,26 +54,26 @@ def run():
         if agree:
             st.dataframe(data)
         samples = data.transcription
-        text_labels  = [label_name.lower() for label_name in data.medical_specialty]
+        text_labels = [label_name.lower() for label_name in data.medical_specialty]
         labels = enc.fit_transform(np.array(text_labels))
         labels = np.ravel(labels)
         unique_values, counts = np.unique(labels, return_counts=True)
         relative_counts = counts/np.sum(counts)
-        st.write("The initial data set contains",np.shape(unique_values)[0],"classes and",data.shape[0],"samples.")
+        st.write("The initial data set contains", np.shape(unique_values)[0], "classes and", data.shape[0], "samples.")
 
         # EXTRACT SAMPLES AND LABELS.
-        st.sidebar.header("Preprocessing class distributions.")
-        treshhold_to_consider = st.sidebar.slider("Minimum fraction of class in initial data set.", min_value=0.01, max_value=0.1, value=0.04, step=0.01)
-        classes_to_consider = unique_values[relative_counts>=treshhold_to_consider]
+        st.sidebar.header("Preprocessing class distribution.")
+        treshold_to_consider = st.sidebar.slider("Minimum fraction of class in initial data set.", min_value=0.01, max_value=0.1, value=0.06, step=0.01)
+        classes_to_consider = unique_values[relative_counts >= treshold_to_consider]
 
         index_to_consider = np.empty((labels.shape[0]),dtype="bool")
-        for i,label in enumerate(labels):
+        for i, label in enumerate(labels):
             if label in classes_to_consider:
                 index_to_consider[i] = True
             else:
                 index_to_consider[i] = False
 
-        # EXTRACT CLASSES
+        # EXTRACT RELEVANT CLASSES
         labels = labels[index_to_consider]
         samples = samples[index_to_consider]
         unique_values, counts = np.unique(labels, return_counts=True)
@@ -82,96 +81,92 @@ def run():
         label_names = enc.inverse_transform(unique_values)
 
         # INSTRUCTION
-        st.info("Some classes might be **underrepresented** in the data set and should be dropped. Choose a treshold for minimum abundance in the original data set.")
-        st.write("The final number of classes is",np.size(unique_values)," and the residual number of samples is",np.sum(index_to_consider),".")
-        rel_counts = pd.DataFrame(data=relative_counts,columns=["fraction of class in data set"]).set_index(label_names)
+        st.info("Some classes might be **underrepresented** in the data set. Consider removing them.")
+        st.write("The final number of classes is", np.size(unique_values), " and the residual number of samples is", np.sum(index_to_consider), ".")
+        rel_counts = pd.DataFrame(data=relative_counts, columns=["fraction of class in reduced data set"]).set_index(label_names)
         st.table(rel_counts)
 
         # DATA TRANSFORMATION
-        st.subheader("Transform data.")
+        st.subheader("Transform the data.")
         st.sidebar.header("Constructing dictonary of words.")
-        if st.sidebar.checkbox("Use word counts instead."):
+        if st.sidebar.checkbox("Use raw word count."):
             st.write("Transform the text data into **word count** representation.")
-            max_df = st.sidebar.slider("Maximum fraction for a word to be considered.", min_value=0.05, max_value=0.4, value=0.2, step=0.01)
-            min_df = st.sidebar.slider("Minimum fraction for a word to be considered.", min_value=0.00, max_value=0.05, value=0.01, step=0.01)
+            max_df = st.sidebar.slider("Maximum count of a word to be considered.", min_value=500, max_value=2000, value=1000, step=100)
+            min_df = st.sidebar.slider("Minimum count of a word to be considered.", min_value=0, max_value=500, value=100, step=100)
             max_features = st.sidebar.slider("Size of dictionary.", min_value=100, max_value=1000, value=500, step=100)
-            ngram_range = (1,1)
-            tfidf_vectorizer = CountVectorizer(max_df=max_df, min_df=min_df,max_features=max_features,stop_words='english',ngram_range=ngram_range)
+            ngram_range = (1, 1)
+            tfidf_vectorizer = CountVectorizer(max_df=max_df, min_df=min_df, max_features=max_features,stop_words='english',ngram_range=ngram_range)
         else:
             st.write("Transform the text data into **term frequency–inverse document frequency (tf-idf)** representation. Customize the dictionary in the sidebar. Alternatively, you can also work with pure word counts.")
-            max_df = st.sidebar.slider("Maximum tf-idf value for a word to be considered.", min_value=0.05, max_value=0.4, value=0.3, step=0.01)
-            min_df = st.sidebar.slider("Minimum tf-idf value for a word to be considered.", min_value=0.00, max_value=0.05, value=0.01, step=0.01)
+            max_df = st.sidebar.slider("Maximum tf-idf value of a word to be considered.", min_value=0.1, max_value=1.0, value=0.6, step=0.01)
+            min_df = st.sidebar.slider("Minimum tf-idf value of a word to be considered.", min_value=0.0, max_value=0.1, value=0.05, step=0.01)
             max_features = st.sidebar.slider("Size of dictionary.", min_value=100, max_value=1000, value=500, step=100)
-            ngram_range = (1,1)
-            tfidf_vectorizer = TfidfVectorizer(max_df=max_df, min_df=min_df, max_features=max_features, stop_words='english',ngram_range=ngram_range)
+            ngram_range = (1, 1)
+            tfidf_vectorizer = TfidfVectorizer(max_df=max_df, min_df=min_df, max_features=max_features, stop_words='english', ngram_range=ngram_range)
 
-        #dimred =  NMF(n_components=2, random_state=1,beta_loss='kullback-leibler', solver='mu', max_iter=1000, alpha=.4,l1_ratio=.5)
-        #dimred = LatentDirichletAllocation(n_components=2, max_iter=5,learning_method='online',learning_offset=50,random_state=1)
+        # DIMENSIONALITY REDUCTION
         dimred = TruncatedSVD(n_components=2)
 
-        #@st.cache(show_spinner=False)
         def transform():
             tfidf = tfidf_vectorizer.fit_transform(samples)
             feature_names = tfidf_vectorizer.get_feature_names()
             return tfidf, feature_names
 
-        # TF-IDF
+        # SCATTER PLOT
         with st.spinner('Data is being transformed.'):
             tfidf, feature_names = transform()
             st.success("Transformation finished.")
-            st.subheader("Visualize data.")
+            st.subheader("Visualize the data.")
             st.write("Examine the distribution of classes by dimensionality reduction based on **singular value decomposition (SVD)**.")
             data_ = dimred.fit_transform(tfidf)
-            data__ = pd.DataFrame(data=data_, columns=["principal component 1","principal component 2"])
+            data_ = pd.DataFrame(data=data_, columns=["principal component 1", "principal component 2"])
             labels_ = pd.DataFrame(data=enc.inverse_transform(labels), columns=["class"])
-            data___ = pd.concat((data__,labels_),axis=1)
-            c = alt.Chart(data___,title="dimensionality reduction", height=400).mark_circle(size=20).encode(x='principal component 1', y='principal component 2', color=alt.Color('class', scale=alt.Scale(scheme='blues')), tooltip=["class"]).interactive()
+            data_ = pd.concat((data_, labels_), axis=1)
+            c = alt.Chart(data_, title="dimensionality reduction", height=500).mark_circle(size=20).encode(x='principal component 1', y='principal component 2', color=alt.Color('class', scale=alt.Scale(scheme='blues')), tooltip=["class"]).interactive()
             st.altair_chart(c)
             st.write("The fraction of variance explained is", np.round(np.sum(dimred.explained_variance_ratio_),2),".")
 
         # MODEL BUILDING.
-        st.header("Model Building")
+        st.header("Training")
         st.write("The model is based on a **random forest**. Customize the model hyperparameters in the sidebar.")
         st.sidebar.header("Customizing the model.")
         n_estimators = st.sidebar.text_input('Number of trees in random forest.', '1000')
         max_leaf_nodes = st.sidebar.text_input('Maximum number of leaf nodes in a tree.', '25')
         max_depth = st.sidebar.text_input('Maximum depth of a tree.', '5')
-        class_weight = st.sidebar.selectbox("Class weights for the model.",('balanced','balanced_subsample'))
-        forest_clf = RandomForestClassifier(n_estimators=int(n_estimators), max_depth=int(max_depth), max_leaf_nodes=int(max_leaf_nodes),class_weight=class_weight, oob_score=True,random_state=0) # Define classifier to optimize.
+        class_weight = st.sidebar.selectbox("Class weights for the model.", ('balanced','balanced_subsample'))
+        forest_clf = RandomForestClassifier(n_estimators=int(n_estimators), max_depth=int(max_depth), max_leaf_nodes=int(max_leaf_nodes), class_weight=class_weight, oob_score=True, random_state=0) # Define classifier to optimize.
         # parameters = {'max_leaf_nodes':np.linspace(20,35,14,dtype='int')} # Define grid. 
         # clf = RandomizedSearchCV(forest_clf, parameters, n_iter=10, cv=3,iid=False, scoring='accuracy',n_jobs=-1) # Balanced accuracy as performance measure.
 
         #@st.cache(show_spinner=False)
         def train():
-            classifier = forest_clf.fit(tfidf, labels) # Train/optimize classifier.
-            #forest = classifier.best_estimator_
+            classifier = forest_clf.fit(tfidf, labels)  # Train/optimize classifier.
             feature_importances = classifier.feature_importances_
             indices = np.argsort(feature_importances)[::-1]
 
-            # Analyze Feature Importance.
-            n_f = 30 # Amount of Desired Features.
+            n_f = 30 
             sorted_feature_names = []
             for f in range(n_f):
                 sorted_feature_names.append(feature_names[indices[f]])
-            #feature_importance = pd.DataFrame(data=feature_importances[indices[0:n_f]], index=sorted_feature_names,columns=["feature importance"])
-            feature_importance = pd.DataFrame(data=np.transpose(np.array((np.round(feature_importances[indices[0:n_f]],3),sorted_feature_names))),columns=["feature importance","features"])
-            return classifier,feature_importance
+            feature_importance = pd.DataFrame(data=np.transpose(np.array((np.round(feature_importances[indices[0:n_f]], 3), sorted_feature_names))), columns=["relative importance", "features"])
+            return classifier, feature_importance
 
+        # BAR PLOT
         with st.spinner('Model is being trained.'):
-            classifier,feature_importance = train() # Train/optimize classifier.
+            classifier, feature_importance = train()
             st.success("Training finished.")
             st.write("Examine the importance of the most meaningful words for the overall classification performance.")
-            bars = alt.Chart(feature_importance,height=400,title="discriminative power of features").mark_bar(color='steelblue',opacity=0.7).encode(
-            y='features:N',
-            x='feature importance:Q',tooltip="feature importance")
+            bars = alt.Chart(feature_importance, height=500, title="discriminative power of features").mark_bar(color='steelblue', opacity=0.7).encode(
+                y='features:N',
+                x='relative importance:Q', tooltip="relative importance")
             st.altair_chart(bars)
-            st.write('The test set accuracy (from out-of-bag samples) is',np.round(classifier.oob_score_,2),".")
+            st.write('The test set accuracy (from out-of-bag samples) is', np.round(classifier.oob_score_, 2), ".")
         
         # MODEL EVALUATION
-        st.header("Model Evaluation")
+        st.header("Evaluation")
         y_true = labels
         y_pred = classifier.predict(tfidf)
-        f1_score_ = f1_score(y_true,y_pred,average="weighted")
+        f1_score_ = f1_score(y_true, y_pred, average="weighted")
         st.write("The **F1 score** is",np.round(f1_score_,2),".")
         st.write("Below, the **confusion matrix** for the classification problem is provided.")
         cm = confusion_matrix(y_true,y_pred)
@@ -181,24 +176,29 @@ def run():
             labels_repeated.append(np.unique(labels_))
         source = pd.DataFrame({'predicted class': np.transpose(np.array(labels_repeated)).ravel(),
                             'true class': np.array(labels_repeated).ravel(),
-                            'fraction': np.round(cm.ravel(),2)})
-        heat = alt.Chart(source,height=500,title="confusion matrix").mark_rect(opacity=0.7).encode(
-        x='predicted class:N',
-        y='true class:N',
-        color=alt.Color('fraction:Q', scale=alt.Scale(scheme='blues')),
-        tooltip="fraction")
+                            'fraction': np.round(cm.ravel(), 2)})
+        heat = alt.Chart(source, height=500, title="confusion matrix").mark_rect(opacity=0.7).encode(
+            x='predicted class:N',
+            y='true class:N',
+            color=alt.Color('fraction:Q', scale=alt.Scale(scheme='blues')),
+            tooltip="fraction")
         st.altair_chart(heat)
 
         # PREDICTION
-        # st.header("Prediction")
-        # st.write("The trained model can now be used for **prediction**.")
-        # text = st.text_area("Provide a clinical document for prediction of the medical specialty.",value=data.transcription[data.medical_specialty[data.medical_specialty==' Surgery'].index[0]].lower())
-        # sample = tfidf_vectorizer.transform([text])
-        # probabilities = classifier.predict_proba(sample).ravel()
-        # class_labels = np.unique(labels_)
-        # source_ = pd.DataFrame(data=np.transpose(np.array((np.round(probabilities,2),class_labels))),columns=["probabilities","class"])
-        # bars = alt.Chart(source_,height=400,title="class probabilities").mark_bar(color="steelblue",opacity=0.7).encode(y='class:N',x='probabilities:Q',tooltip="probabilities")
-        # st.altair_chart(bars)
+        st.header("Prediction")
+        st.subheader("Provide a document.")
+        st.write("The model can now be used for **prediction** of the medical specialty.")
+        
+        desc = "CHIEF COMPLAINT: Non-healing surgical wound to the left posterior thigh. HISTORY OF PRESENT ILLNESS: This is a 49-year-old white male who sustained a traumatic injury to his left posterior thighthis past year while in ABCD. He sustained an injury from the patellar from a boat while in the water. He was air lifted actually up to XYZ Hospital and underwent extensive surgery. He still has an external fixation on it for the healing fractures in the leg and has undergone grafting and full thickness skin grafting closure to a large defect in his left posterior thigh, which is nearly healed right in the gluteal fold on that left area. In several areas right along the graft site and low in the leg, the patient has several areas of hypergranulation tissue. He has some drainage from these areas. There are no signs and symptoms of infection. He is referred to us to help him get those areas under control. PAST MEDICAL HISTORY: Essentially negative other than he has had C. difficile in the recent past. ALLERGIES: None. MEDICATIONS: Include Cipro and Flagyl. PAST SURGICAL HISTORY: Significant for his trauma surgery noted above. FAMILY HISTORY: His maternal grandmother had pancreatic cancer. Father had prostate cancer. There is heart disease in the father and diabetes in the father. SOCIAL HISTORY: He is a non-cigarette smoker and non-ETOH user.  He is divorced. He has three children. He has an attorney. PHYSICAL EXAMINATION: He presents as a well-developed, well-nourished 49-year-old white male who appears to be in no significant distress. IMPRESSION: Several multiple areas of hypergranulation tissue on the left posterior leg associated with a sense of trauma to his right posterior leg. PLAN: Plan would be for chemical cauterization of these areas. Series of treatment with chemical cauterization till these are closed."
+        text = st.text_area("Write down some input.", value=desc)
+        sample = tfidf_vectorizer.transform([text])
+        pred_class = classifier.predict(sample).ravel()
+        probability = np.round(np.max(classifier.predict_proba(sample).ravel()), 2)
+        class_label = enc.inverse_transform(pred_class)[0]
+        
+        st.subheader("Examine the result.")
+        st.write("This sample originates from the specialty **"+class_label+"** with a probability of", probability, ".")
+        
     else:
         st.header("Introduction")
         st.write("This application guides you through the development of a language model that classifies clinical documents according to their **medical specialty**.",
@@ -214,7 +214,7 @@ def run():
         
         st.write("The model is developed with scikit-learn. Some possible degrees of freedom are shown in the sidebar. By adjusting them, the model is retrained and its performance re-evaluated.")
 
-        st.markdown("**Start by choosing a file**.")
+        st.info("**Start by choosing a file**.")
 
 
 if __name__ == "__main__":
