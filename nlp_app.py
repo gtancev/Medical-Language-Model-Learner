@@ -42,10 +42,10 @@ def run():
         # DEFINE DATA.
         st.header("Preprocessing")
         st.write("First, data has to be preprocessed by adjusting the number of classes before transforming the data.",
-        "As you can imagine, not every class might be represented properly in a data set to classify it adequately.",
+        "As you can imagine, not every **class (specialty)** might be represented properly in a data set to classify it adequately.",
         "It is advisable to remove classes which are underrepresented and whose abundance is below some treshold to achieve a better classification performance.",
         "(Alternatively, try to collect more data.)")
-        st.write("In addition, there are several degrees of freedom for the construction of the dictionary. Adjusting those parameters has an influence on the amount and kind of words (features) which are included in the model.")
+        st.write("In addition, there are several degrees of freedom for the construction of the vocabulary. Adjusting those parameters has an influence on the amount and kind of words (features) which are included in the model.")
         st.subheader("Load data.")
         st.write("Display sample data by ticking the checkbox in the sidebar.")
         #filename = st.sidebar.text_input('Enter the filename of a csv-file.')
@@ -88,19 +88,19 @@ def run():
 
         # DATA TRANSFORMATION
         st.subheader("Transform data.")
-        st.sidebar.header("Constructing dictonary of words.")
+        st.sidebar.header("Constructing vocabulary.")
         if st.sidebar.checkbox("Use raw word count."):
             st.write("Transform the text data into **word count** representation.")
             max_df = st.sidebar.slider("Maximum count of a word to be considered.", min_value=500, max_value=2000, value=1000, step=100)
             min_df = st.sidebar.slider("Minimum count of a word to be considered.", min_value=0, max_value=500, value=100, step=100)
-            max_features = st.sidebar.slider("Size of dictionary.", min_value=100, max_value=1000, value=500, step=100)
+            max_features = st.sidebar.slider("Size of vocabulary.", min_value=100, max_value=1000, value=500, step=100)
             ngram_range = (1, 1)
-            tfidf_vectorizer = CountVectorizer(max_df=max_df, min_df=min_df, max_features=max_features,stop_words='english',ngram_range=ngram_range)
+            tfidf_vectorizer = CountVectorizer(max_df=max_df, min_df=min_df, max_features=max_features, stop_words='english', ngram_range=ngram_range)
         else:
-            st.write("Transform the text data into **term frequency–inverse document frequency (tf-idf)** representation. Customize the dictionary in the sidebar. Alternatively, you can also work with pure word counts.")
+            st.write("Transform the text data into **term frequency–inverse document frequency (tf-idf)** representation. Customize the vocabulary in the sidebar. Alternatively, you can also work with pure word counts.")
             max_df = st.sidebar.slider("Maximum tf-idf value of a word to be considered.", min_value=0.1, max_value=1.0, value=0.6, step=0.01)
             min_df = st.sidebar.slider("Minimum tf-idf value of a word to be considered.", min_value=0.0, max_value=0.1, value=0.05, step=0.01)
-            max_features = st.sidebar.slider("Size of dictionary.", min_value=100, max_value=1000, value=500, step=100)
+            max_features = st.sidebar.slider("Size of vocabulary.", min_value=100, max_value=1000, value=500, step=100)
             ngram_range = (1, 1)
             tfidf_vectorizer = TfidfVectorizer(max_df=max_df, min_df=min_df, max_features=max_features, stop_words='english', ngram_range=ngram_range)
 
@@ -122,9 +122,9 @@ def run():
             data_ = pd.DataFrame(data=data_, columns=["principal component 1", "principal component 2"])
             labels_ = pd.DataFrame(data=enc.inverse_transform(labels), columns=["class"])
             data_ = pd.concat((data_, labels_), axis=1)
-            c = alt.Chart(data_, title="dimensionality reduction", height=500).mark_circle(size=20).encode(x='principal component 1', y='principal component 2', color=alt.Color('class', scale=alt.Scale(scheme='blues')), tooltip=["class"]).interactive()
+            c = alt.Chart(data_, title="dimensionality reduction", height=500).mark_circle(size=20).encode(x='principal component 1', y='principal component 2', color=alt.Color('class', legend=alt.Legend(orient="right"), scale=alt.Scale(scheme='blues')), tooltip=["class"]).interactive()
             st.altair_chart(c)
-            st.write("The fraction of variance explained is", np.round(np.sum(dimred.explained_variance_ratio_),2),".")
+            st.write("The fraction of variance explained is", np.round(np.sum(dimred.explained_variance_ratio_), 2), ".")
 
         # MODEL BUILDING.
         st.header("Training")
@@ -133,7 +133,7 @@ def run():
         n_estimators = st.sidebar.text_input('Number of trees in random forest.', '1000')
         max_leaf_nodes = st.sidebar.text_input('Maximum number of leaf nodes in a tree.', '25')
         max_depth = st.sidebar.text_input('Maximum depth of a tree.', '5')
-        class_weight = st.sidebar.selectbox("Class weights for the model.", ('balanced','balanced subsample','none'))
+        class_weight = st.sidebar.selectbox("Class weights for the model.", ('balanced', 'balanced subsample', 'none'))
         cw = {}
         cw["balanced"], cw["balanced subsample"], cw["none"] = "balanced", "balanced_subsample", None
         forest_clf = RandomForestClassifier(n_estimators=int(n_estimators), max_depth=int(max_depth), max_leaf_nodes=int(max_leaf_nodes), 
@@ -170,9 +170,9 @@ def run():
         y_true = labels
         y_pred = classifier.predict(tfidf)
         f1_score_ = f1_score(y_true, y_pred, average="weighted")
-        st.write("The **F1 score** is",np.round(f1_score_,2),".")
+        st.write("The **F1 score** is",np.round(f1_score_,2), ".")
         st.write("Below, the **confusion matrix** for the classification problem is provided.")
-        cm = confusion_matrix(y_true,y_pred)
+        cm = confusion_matrix(y_true, y_pred)
         cm = (cm.astype('float') / cm.sum(axis=1)[:, np.newaxis])
         labels_repeated = []
         for _ in range(np.unique(labels_).shape[0]):
