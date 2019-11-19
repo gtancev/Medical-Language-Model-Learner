@@ -27,14 +27,14 @@ def run():
     st.sidebar.text("© Georgi Tancev")
     st.title("Medical Language Model Learner (MLML)")
     st.sidebar.header("Loading data.")
-    filename = st.sidebar.selectbox("Choose a file.",("None","mtsamples"))
+    filename = st.sidebar.selectbox("Choose a file.", ("None", "mtsamples"))
 
     # LOAD DATA.
     if filename is not "None":
         if len(filename.split(".")) == 1:
             filename = filename+".csv"
         try:
-            data = pd.read_csv(filename,index_col=0,usecols=[0,1,2,4])
+            data = pd.read_csv(filename, index_col=0, usecols=[0,1,2,4])
             data = data.dropna()
         except:
             st.error("No such file could be found in the working directory. Make sure it is there and it is a csv-file.")
@@ -130,7 +130,7 @@ def run():
         st.header("Training")
         st.write("The model is based on a **random forest**. Customize the model hyperparameters in the sidebar.")
         st.sidebar.header("Customizing model.")
-        n_estimators = st.sidebar.text_input('Number of trees in random forest.', '1000')
+        n_estimators = st.sidebar.text_input('Number of trees in random forest.', '100')
         max_leaf_nodes = st.sidebar.text_input('Maximum number of leaf nodes in a tree.', '25')
         max_depth = st.sidebar.text_input('Maximum depth of a tree.', '5')
         class_weight = st.sidebar.selectbox("Class weights for the model.", ('balanced', 'balanced subsample', 'none'))
@@ -170,7 +170,7 @@ def run():
         y_true = labels
         y_pred = classifier.predict(tfidf)
         f1_score_ = f1_score(y_true, y_pred, average="weighted")
-        st.write("The **F1 score** is",np.round(f1_score_,2), ".")
+        st.write("The **F1 score** is",np.round(f1_score_, 2), ".")
         st.write("Below, the **confusion matrix** for the classification problem is provided.")
         cm = confusion_matrix(y_true, y_pred)
         cm = (cm.astype('float') / cm.sum(axis=1)[:, np.newaxis])
